@@ -1,0 +1,77 @@
+# Creditra Backend
+
+API and services for the Creditra adaptive credit protocol: credit lines, risk evaluation, and (future) Horizon listener and interest accrual.
+
+## About
+
+This service provides:
+
+- **API gateway** — REST endpoints for credit lines and risk evaluation
+- **Health check** — `/health` for readiness
+- **Planned:** Risk engine (wallet history, scoring), Horizon listener (events → DB), interest accrual, liquidity pool manager
+
+Stack: **Node.js**, **Express**, **TypeScript**.
+
+## Tech Stack
+
+- **Express** — HTTP API
+- **TypeScript** — ESM, strict mode
+- **tsx** — dev run with watch
+
+## Setup
+
+### Prerequisites
+
+- Node.js 18+
+- npm or yarn
+
+### Install and run
+
+```bash
+cd creditra-backend
+npm install
+```
+
+**Development (watch):**
+
+```bash
+npm run dev
+```
+
+**Production:**
+
+```bash
+npm run build
+npm start
+```
+
+API base: [http://localhost:3000](http://localhost:3000).
+
+### Environment
+
+| Variable | Description |
+|----------|-------------|
+| `PORT`   | Server port (default: 3000) |
+
+Optional later: `DATABASE_URL`, `REDIS_URL`, `HORIZON_URL`, etc.
+
+## API (current)
+
+- `GET /health` — Service health
+- `GET /api/credit/lines` — List credit lines (placeholder)
+- `GET /api/credit/lines/:id` — Get credit line by id (placeholder)
+- `POST /api/risk/evaluate` — Request risk evaluation; body: `{ "walletAddress": "..." }`
+
+## Project layout
+
+- `src/index.ts` — App entry, middleware, route mounting
+- `src/routes/` — credit and risk route handlers
+
+## Merging to remote
+
+This repo is a standalone git repository. After adding your remote:
+
+```bash
+git remote add origin <your-creditra-backend-repo-url>
+git push -u origin main
+```
