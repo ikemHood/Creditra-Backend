@@ -106,3 +106,31 @@ creditRouter.get('/wallet/:walletAddress/lines', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch credit lines for wallet' });
   }
 });
+
+router.post(
+  "/lines/:id/suspend",
+  adminAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const line = suspendCreditLine(req.params["id"] as string);
+      res.json({ data: line, message: "Credit line suspended." });
+    } catch (err) {
+      handleServiceError(err, res);
+    }
+  },
+);
+
+router.post(
+  "/lines/:id/close",
+  adminAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const line = closeCreditLine(req.params["id"] as string);
+      res.json({ data: line, message: "Credit line closed." });
+    } catch (err) {
+      handleServiceError(err, res);
+    }
+  },
+);
+
+export default router;
