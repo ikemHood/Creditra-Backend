@@ -8,6 +8,7 @@ import swaggerUi from 'swagger-ui-express';
 
 import { creditRouter } from './routes/credit.js';
 import { riskRouter } from './routes/risk.js';
+import { ok } from './utils/response.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const openapiSpec = yaml.parse(
@@ -15,6 +16,7 @@ const openapiSpec = yaml.parse(
 );
 
 const app = express();
+export const app = express();
 const port = process.env.PORT ?? 3000;
 
 app.use(cors());
@@ -26,7 +28,7 @@ app.get('/docs.json', (_req, res) => res.json(openapiSpec));
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'creditra-backend' });
+  ok(res, { status: 'ok', service: 'creditra-backend' });
 });
 
 app.use('/api/credit', creditRouter);
@@ -38,3 +40,9 @@ app.listen(port, () => {
 });
 
 export { app };  // exported for tests
+// Only start the server if not imported by tests setup
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(port, () => {
+    console.log(`Creditra API listening on http://localhost:${port}`);
+  });
+}
