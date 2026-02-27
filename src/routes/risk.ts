@@ -3,6 +3,8 @@ import { validateBody } from '../middleware/validate.js';
 import { riskEvaluateSchema } from '../schemas/index.js';
 import type { RiskEvaluateBody } from '../schemas/index.js';
 import { Router, Request, Response } from "express";
+import { evaluateWallet, InvalidWalletAddressError } from "../services/riskService.js";
+import { isValidStellarPublicKey } from "../utils/stellarAddress.js";
 import { Container } from '../container/Container.js';
 import { Router, Request, Response } from 'express';
 import { createApiKeyMiddleware } from '../middleware/auth.js';
@@ -44,6 +46,9 @@ riskRouter.post(
   async (req: Request, res: Response): Promise<void> => {
     const { walletAddress } = req.body as { walletAddress?: string };
 
+    if (typeof walletAddress !== "string" || walletAddress.trim().length === 0) {
+      fail(res, "walletAddress is required", 400);
+      return;
     if (!walletAddress) {
       return res.status(400).json({ error: 'walletAddress required' });
     }
@@ -74,6 +79,21 @@ riskRouter.get('/evaluations/:id', async (req, res) => {
   }
 });
 
+    const normalizedWalletAddress = walletAddress.trim();
+    if (!isValidStellarPublicKey(normalizedWalletAddress)) {
+      fail(res, "Invalid wallet address format.", 400);
+      return;
+    }
+
+    try {
+      const result = await evaluateWallet(normalizedWalletAddress);
+      ok(res, result);
+    } catch (err) {
+      if (err instanceof InvalidWalletAddressError) {
+        fail(res, err.message, 400);
+        return;
+      }
+      fail(res, "Unable to evaluate wallet at this time.", 500);
 riskRouter.get('/wallet/:walletAddress/latest', async (req, res) => {
   try {
     const evaluation = await container.riskEvaluationService.getLatestRiskEvaluation(req.params.walletAddress);
