@@ -1,3 +1,5 @@
+import { Router } from 'express';
+import { Container } from '../container/Container.js';
 import { Router, Request, Response } from 'express';
 import { createApiKeyMiddleware } from '../middleware/auth.js';
 import { loadApiKeys } from '../config/apiKeys.js';
@@ -12,7 +14,27 @@ import {
 } from "../services/creditService.js";
 
 export const creditRouter = Router();
+const container = Container.getInstance();
 
+creditRouter.get('/lines', async (req, res) => {
+  try {
+    const { offset, limit } = req.query;
+    const offsetNum = offset ? parseInt(offset as string) : undefined;
+    const limitNum = limit ? parseInt(limit as string) : undefined;
+    
+    const creditLines = await container.creditLineService.getAllCreditLines(offsetNum, limitNum);
+    const total = await container.creditLineService.getCreditLineCount();
+    
+    res.json({ 
+      creditLines,
+      pagination: {
+        total,
+        offset: offsetNum || 0,
+        limit: limitNum || 100
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch credit lines' });
 // Use a resolver function so API_KEYS is read lazily per-request,
 // allowing the env var to be set after module import (e.g. in tests).
 const requireApiKey = createApiKeyMiddleware(() => loadApiKeys());
@@ -22,13 +44,78 @@ function handleServiceError(err: unknown, res: Response): void {
     fail(res, err.message, 404);
     return;
   }
-  if (err instanceof InvalidTransitionError) {
-    fail(res, err.message, 409);
-    return;
-  }
-  fail(res, err, 500);
-}
+});
 
+creditRouter.get('/lines/:id', async (req, res) => {
+  try {
+    const creditLine = await container.creditLineService.getCreditLine(req.params.id);
+    
+    if (!creditLine) {
+      return res.status(404).json({ error: 'Credit line not found', id: req.params.id });
+    }
+    
+    res.json(creditLine);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch credit line' });
+  }
+});
+
+creditRouter.post('/lines', async (req, res) => {
+  try {
+    const { walletAddress, creditLimit, interestRateBps } = req.body;
+    
+    if (!walletAddress || !creditLimit || interestRateBps === undefined) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: walletAddress, creditLimit, interestRateBps' 
+      });
+    }
+    
+    const creditLine = await container.creditLineService.createCreditLine({
+      walletAddress,
+      creditLimit,
+      interestRateBps
+    });
+    
+    res.status(201).json(creditLine);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to create credit line';
+    res.status(400).json({ error: message });
+  }
+});
+
+creditRouter.put('/lines/:id', async (req, res) => {
+  try {
+    const { creditLimit, interestRateBps, status } = req.body;
+    
+    const creditLine = await container.creditLineService.updateCreditLine(req.params.id, {
+      creditLimit,
+      interestRateBps,
+      status
+    });
+    
+    if (!creditLine) {
+      return res.status(404).json({ error: 'Credit line not found', id: req.params.id });
+    }
+    
+    res.json(creditLine);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to update credit line';
+    res.status(400).json({ error: message });
+  }
+});
+
+creditRouter.delete('/lines/:id', async (req, res) => {
+  try {
+    const deleted = await container.creditLineService.deleteCreditLine(req.params.id);
+    
+    if (!deleted) {
+      return res.status(404).json({ error: 'Credit line not found', id: req.params.id });
+    }
+    
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete credit line' });
+  }
 // ---------------------------------------------------------------------------
 // Public endpoints – no API key required
 // ---------------------------------------------------------------------------
@@ -37,13 +124,13 @@ creditRouter.get("/lines", (_req: Request, res: Response): void => {
   ok(res, listCreditLines());
 });
 
-creditRouter.get("/lines/:id", (req: Request, res: Response): void => {
-  const line = getCreditLine(req.params["id"] as string);
-  if (!line) {
-    fail(res, `Credit line "${req.params["id"]}" not found.`, 404);
-    return;
+creditRouter.get('/wallet/:walletAddress/lines', async (req, res) => {
+  try {
+    const creditLines = await container.creditLineService.getCreditLinesByWallet(req.params.walletAddress);
+    res.json({ creditLines });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch credit lines for wallet' });
   }
-  ok(res, line);
 });
 
 // ---------------------------------------------------------------------------

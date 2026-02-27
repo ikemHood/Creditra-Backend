@@ -1,3 +1,5 @@
+import { Router } from 'express';
+import { Container } from '../container/Container.js';
 import { Router, Request, Response } from 'express';
 import { createApiKeyMiddleware } from '../middleware/auth.js';
 import { loadApiKeys } from '../config/apiKeys.js';
@@ -5,7 +7,12 @@ import { evaluateWallet } from "../services/riskService.js";
 import { ok, fail } from "../utils/response.js";
 
 export const riskRouter = Router();
+const container = Container.getInstance();
 
+riskRouter.post('/evaluate', async (req, res) => {
+  try {
+    const { walletAddress, forceRefresh } = req.body ?? {};
+    
 // Use a resolver so API_KEYS is read lazily per-request (handy for tests).
 const requireApiKey = createApiKeyMiddleware(() => loadApiKeys());
 
@@ -23,17 +30,65 @@ riskRouter.post(
     const { walletAddress } = req.body as { walletAddress?: string };
 
     if (!walletAddress) {
-      fail(res, "walletAddress is required", 400);
-      return;
+      return res.status(400).json({ error: 'walletAddress required' });
     }
+    
+    const result = await container.riskEvaluationService.evaluateRisk({
+      walletAddress,
+      forceRefresh
+    });
+    
+    res.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Risk evaluation failed';
+    res.status(500).json({ error: message });
+  }
+});
 
-    try {
-      const result = await evaluateWallet(walletAddress);
-      ok(res, result);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Unknown error";
-      fail(res, message, 400);
+riskRouter.get('/evaluations/:id', async (req, res) => {
+  try {
+    const evaluation = await container.riskEvaluationService.getRiskEvaluation(req.params.id);
+    
+    if (!evaluation) {
+      return res.status(404).json({ error: 'Risk evaluation not found', id: req.params.id });
     }
+    
+    res.json(evaluation);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch risk evaluation' });
+  }
+});
+
+riskRouter.get('/wallet/:walletAddress/latest', async (req, res) => {
+  try {
+    const evaluation = await container.riskEvaluationService.getLatestRiskEvaluation(req.params.walletAddress);
+    
+    if (!evaluation) {
+      return res.status(404).json({ error: 'No risk evaluation found for wallet' });
+    }
+    
+    res.json(evaluation);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch latest risk evaluation' });
+  }
+});
+
+riskRouter.get('/wallet/:walletAddress/history', async (req, res) => {
+  try {
+    const { offset, limit } = req.query;
+    const offsetNum = offset ? parseInt(offset as string) : undefined;
+    const limitNum = limit ? parseInt(limit as string) : undefined;
+    
+    const evaluations = await container.riskEvaluationService.getRiskEvaluationHistory(
+      req.params.walletAddress,
+      offsetNum,
+      limitNum
+    );
+    
+    res.json({ evaluations });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch risk evaluation history' });
+  }
   },
 );
 

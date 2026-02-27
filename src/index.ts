@@ -33,6 +33,8 @@ app.get('/health', (_req, res) => {
 app.use('/api/credit', creditRouter);
 app.use('/api/risk', riskRouter);
 
+// Only start server if this file is run directly (not imported for testing)
+if (import.meta.url === `file://${process.argv[1]}`) {
 // Only start listening when this file is the entry-point (not when imported by tests).
 /* istanbul ignore next */
 if (process.env.NODE_ENV !== 'test') {
@@ -41,3 +43,5 @@ if (process.env.NODE_ENV !== 'test') {
     console.log(`Swagger UI available at  http://localhost:${port}/docs`);
   });
 }
+
+export default app;
